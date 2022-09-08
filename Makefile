@@ -4,8 +4,9 @@ CC = gcc
 # compiler flags:
 #  -g    adds debugging information to the executable file
 #  -Wall turns on most, but not all, compiler warnings
-#  -lrt  needed to use shm_open
-CFLAGS  = -g -Wall -lrt
+#  -lrt  needed to use shared memory
+#  -pthread needed to use semaphores
+CFLAGS  = -g -Wall -lrt -pthread -fsanitize=address
 
 # the build target executable:
 objects = application view

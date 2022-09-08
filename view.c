@@ -1,18 +1,16 @@
-#define _BSD_SOURCE
-
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/mman.h>
-#include <sys/stat.h>        /* For mode constants */
-#include <fcntl.h>           /* For O_* constants */
-#include <string.h>
-
 #include "shm_definitions.h"
 
 int main (int argc, char *argv[]) {
 
-    int fd = shm_open(SHM_NAME, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+    sem_t * sem_createShm = sem_open(SEM_CreateShm, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0);
+    if (sem_createShm == SEM_FAILED) perror ("view: sem_open");
+    
+    sem_t * sem_waitView = sem_open(SEM_waitView, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0);
+    if (sem_waitView == SEM_FAILED) perror ("view: sem_open");
+
+    if (sem_wait(sem_createShm) == -1) perror ("view: sem_wait");
+
+    int fd = shm_open(SHM_NAME, O_RDWR, 0);
     if (fd == -1) perror ("view: shm_open");
 
     if (ftruncate(fd, SHM_SIZE) == -1) perror("view: ftruncate");
@@ -27,6 +25,8 @@ int main (int argc, char *argv[]) {
         sleep(1);
     }
     printf("Message recieved: %s\n", map);
+
+    if (sem_post(sem_waitView) == -1) perror("View: sem_post");
 
     // if (munmap(address, SHM_SIZE) == -1) perror("view: munmap");
     // if (shm_unlink(SHM_NAME) == -1) perror("view: shm_unlink");
