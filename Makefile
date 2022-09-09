@@ -9,7 +9,7 @@ CC = gcc
 CFLAGS  = -g -Wall -lrt -pthread -fsanitize=address
 
 # the build target executable:
-objects = application view
+objects = application view slave
 all: $(objects)
 
 $(objects): %: %.c
