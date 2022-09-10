@@ -1,4 +1,4 @@
-#include "shm_definitions.h"
+#include "definitions.h"
 
 void clearBuffer(char * buffer) {
     int i = 0;

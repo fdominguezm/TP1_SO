@@ -6,7 +6,7 @@ CC = gcc
 #  -Wall turns on most, but not all, compiler warnings
 #  -lrt  needed to use shared memory
 #  -pthread needed to use semaphores
-CFLAGS  = -g -Wall -lrt -pthread -fsanitize=address
+CFLAGS  = -g -Wall -lrt -pthread -fsanitize=address -std=gnu99
 
 # the build target executable:
 objects = application view slave
