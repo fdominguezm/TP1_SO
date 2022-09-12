@@ -22,6 +22,7 @@
 #define SEM_CreateShm "/sem1"
 #define SEM_newFile "/sem2"
 #define SEM_waitViewToFinish "/sem3"
+#define SEM_waitViewToStart "/sem4"
 #define SLAVE_NUM 5
 #define BUFFER_SIZE 256
 
