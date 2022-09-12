@@ -22,8 +22,8 @@ int main (int argc, char *argv[]) {
 
     sem_t * sem_createShm = sem_open(SEM_CreateShm, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para que el proceso vista espere a que se cree la shared memory
     if (sem_createShm == SEM_FAILED) perror ("create shm sem_open");
-    // sem_t * sem_waitViewToStart = sem_open(SEM_waitViewToStart, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que finalice el proceso vista
-    // if (sem_waitViewToStart == SEM_FAILED) perror ("wait view to finish sem_open");
+    sem_t * sem_waitViewToStart = sem_open(SEM_waitViewToStart, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que finalice el proceso vista
+    if (sem_waitViewToStart == SEM_FAILED) perror ("wait view to finish sem_open");
     sem_t * sem_waitViewToFinish = sem_open(SEM_waitViewToFinish, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que finalice el proceso vista
     if (sem_waitViewToFinish == SEM_FAILED) perror ("wait view to finish sem_open");
     sem_t * sem_newFile = sem_open(SEM_newFile, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); 
@@ -41,37 +41,40 @@ int main (int argc, char *argv[]) {
 
     if (sem_post(sem_createShm) == -1) perror("View to start sem_post");    
     
-    char buff[8];
+    char buff[8] = {0};
     sprintf(buff,"%d\n",num_task); //Envio datos relevantes al proceso vista
     write(STDOUT_FILENO, buff, 8);
 
     sleep(2); //Espero a que comience el proceso vista
 
     // struct timespec time;
-    // time.tv_sec = 2;
+    // time.tv_sec = 8;
     // sem_timedwait(sem_waitViewToStart, &time);
 
     create_slaves(slaves, num_slave, argv); //Creo los esclavos
     read_and_send_files(slaves, num_task, num_slave, shm_p, result_file, argv, sem_newFile);
 
-    // int value;
-    // sem_getvalue(sem_waitViewToStart, &value);
-    // if (value) {
+    int value;
+    sem_getvalue(sem_waitViewToStart, &value);
+    if (value) {
         if (sem_wait(sem_waitViewToFinish) == -1) perror("sem_wait");
-    // } else {
-    //     printf("View did not start\n");
-    // }
+    } else {
+        printf("View did not start\n");
+    }
+
+    // dexec="docker exec -ti \$(docker ps | tail -n1 | cut -d ' ' -f 1) bash"
+
 
 
     // //Unlink a todos los semaforos
     if (sem_unlink(SEM_CreateShm) == -1) perror("sem_unlink");
-    // if (sem_unlink(SEM_waitViewToStart) == -1) perror("sem_unlink");
+    if (sem_unlink(SEM_waitViewToStart) == -1) perror("sem_unlink");
     if (sem_unlink(SEM_waitViewToFinish) == -1) perror("sem_unlink");
     if (sem_unlink(SEM_newFile) == -1) perror("sem_unlink");
 
     if (sem_close(sem_createShm) == -1) perror("sem_unlink");
     if (sem_close(sem_waitViewToFinish) == -1) perror("sem_unlink");
-    // if (sem_close(sem_waitViewToStart) == -1) perror("sem_unlink");
+    if (sem_close(sem_waitViewToStart) == -1) perror("sem_unlink");
     if (sem_close(sem_newFile) == -1) perror("sem_unlink");
 
     if (munmap(address, shm_size) == -1) perror("munmap");
