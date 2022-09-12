@@ -1,6 +1,6 @@
 #include "definitions.h"
 
-void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_p, FILE * result_file, char *const argv[]);
+void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_p, FILE * result_file, char *const argv[], sem_t * sem_newFile);
 void create_slaves(slave slaves[], int num_slave,char *const argv[]);
 
 int main (int argc, char *argv[]) {
@@ -18,40 +18,36 @@ int main (int argc, char *argv[]) {
     FILE *result_file = fopen("fresult.txt", "w"); //Creo el archivo result para enviarselo a los slaves
     if (result_file == NULL) perror("Result File Failed");
 
-    off_t shm_size = num_task * BUFFER_SIZE; //Size de la Shared Memory
+    int shm_size = num_task * BUFFER_SIZE; //Size de la Shared Memory
 
     // sem_t * sem_createShm = sem_open(SEM_CreateShm, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para que el proceso vista espere a que se cree la shared memory
     // if (sem_createShm == SEM_FAILED) perror ("create shm sem_open");
-    // sem_t * sem_waitViewToStart = sem_open(SEM_waitViewToStart, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que comience el proceso vista
-    // if (sem_waitViewToStart == SEM_FAILED) perror ("wait view to start sem_open");
     // sem_t * sem_waitViewToFinish = sem_open(SEM_waitViewToFinish, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que finalice el proceso vista
     // if (sem_waitViewToFinish == SEM_FAILED) perror ("wait view to finish sem_open");
+    sem_t * sem_newFile = sem_open(SEM_newFile, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); 
+    if (sem_newFile == SEM_FAILED) perror ("newFile sem_open");
 
 
     int fd = shm_open(SHM_NAME, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
     if (fd == -1) perror ("shm_open");
 
-    if (ftruncate(fd, shm_size) == -1) perror("ftruncate");
+    if (ftruncate(fd, (off_t)shm_size) == -1) perror("ftruncate");
 
     void * address = mmap(NULL, shm_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (address == MAP_FAILED) perror ("mmap");
     char * shm_p = (char *) address;
-
-    // if (sem_post(sem_createShm) == -1) perror("Create shm sem_post");
-
-    // struct timespec abs_timeout; //Creo la estructura para que espere 2 segundos al proceso vista
-    // abs_timeout.tv_nsec = 2;
-    // if (sem_timedwait(sem_waitViewToStart, &abs_timeout) == -1) perror("sem_timedwait");
     
-    //printf("%s %d %d",SHM_NAME, shm_size,num_task); //Envio datos relevantes al proceso vista
+    printf("%s %d %d\n",SHM_NAME, shm_size,num_task); //Envio datos relevantes al proceso vista
+
+    sleep(2); //Espero a que comience el proceso vista
+
     create_slaves(slaves, num_slave, argv); //Creo los esclavos
-    read_and_send_files(slaves, num_task, num_slave, shm_p, result_file, argv);
+    read_and_send_files(slaves, num_task, num_slave, shm_p, result_file, argv, sem_newFile);
 
     // if (sem_wait(sem_waitViewToFinish) == -1) perror("sem_wait");
 
     // //Unlink a todos los semaforos
     // if (sem_unlink(SEM_CreateShm) == -1) perror("sem_unlink");
-    // if (sem_unlink(SEM_waitViewToStart) == -1) perror("sem_unlink");
     // if (sem_unlink(SEM_waitViewToFinish) == -1) perror("sem_unlink");
 
 
@@ -98,7 +94,7 @@ void create_slaves(slave slaves[], int num_slave,char *const argv[]){
     }
 }
 
-void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_p, FILE * result_file, char *const argv[]){
+void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_p, FILE * result_file, char *const argv[], sem_t *sem_newFile){
     int finished_tasks = 0, tasks_to_send = num_slaves + 1;
     char buffer[BUFFER_SIZE];
 
@@ -123,7 +119,11 @@ void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_
                 finished_tasks++;
                 read(slaves[i].fd_out, buffer, BUFFER_SIZE); 
                 fprintf(result_file,"%d %s",slaves[i].pid, buffer);
-                printf("%d %s\n", slaves[i].pid, buffer);
+                int position = (finished_tasks)*BUFFER_SIZE;
+                strcpy((shm_p+position), buffer);    
+                sem_post(sem_newFile);     
+                // printf("%d %s\n", slaves[i].pid, buffer);
+
                 if (tasks_to_send <= num_task) {
                     write(slaves[i].fd_in, argv[tasks_to_send], strlen(argv[tasks_to_send]));
                 } else {
@@ -132,15 +132,6 @@ void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_
                     slaves[i].active = 0;
                 }
                 tasks_to_send++;
-                // int position = (finished_tasks++)*BUFFER_SIZE;
-                // strcpy((shm_p+position), buffer);
-                // if(tasks_to_send < num_task){
-                //     write(slaves[i].fd_in, argv[tasks_to_send++],BUFFER_SIZE);
-                // }else{
-                //     char c = EOF;
-                //     write(slaves[i].fd_in, &c,1);
-                //     slaves[i].active = 0;
-                // }
             }
         }
     }

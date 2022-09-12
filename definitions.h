@@ -6,6 +6,7 @@
 #define _XOPEN_SOURCE 600
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -19,7 +20,7 @@
 #define SHM_SIZE 1024
 #define VALUE 10
 #define SEM_CreateShm "/sem1"
-#define SEM_waitViewToStart "/sem2"
+#define SEM_newFile "/sem2"
 #define SEM_waitViewToFinish "/sem3"
 #define SLAVE_NUM 5
 #define BUFFER_SIZE 256
