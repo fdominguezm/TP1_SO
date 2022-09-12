@@ -8,3 +8,6 @@ view
 fresult.txt
 *.txt
 ./hola
+.config
+PVS-Studio.log
+strace_out

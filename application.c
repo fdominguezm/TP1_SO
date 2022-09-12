@@ -11,7 +11,7 @@ int main (int argc, char *argv[]) {
 
     int num_task = argc - 1; //Cantidad de archivos
     int num_slave =  (SLAVE_NUM < num_task)?SLAVE_NUM : num_task; // Cantidad de procesos esclavos
-    // int num_slave = 2;
+
     //Creo los vectores para guardar los datos de los slaves
     slave slaves[SLAVE_NUM];
 
@@ -22,14 +22,14 @@ int main (int argc, char *argv[]) {
 
     sem_t * sem_createShm = sem_open(SEM_CreateShm, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para que el proceso vista espere a que se cree la shared memory
     if (sem_createShm == SEM_FAILED) perror ("create shm sem_open");
-    sem_t * sem_waitViewToStart = sem_open(SEM_waitViewToStart, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que finalice el proceso vista
+    sem_t * sem_waitViewToStart = sem_open(SEM_waitViewToStart, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que comience el proceso vista
     if (sem_waitViewToStart == SEM_FAILED) perror ("wait view to finish sem_open");
     sem_t * sem_waitViewToFinish = sem_open(SEM_waitViewToFinish, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para esperar a que finalice el proceso vista
     if (sem_waitViewToFinish == SEM_FAILED) perror ("wait view to finish sem_open");
-    sem_t * sem_newFile = sem_open(SEM_newFile, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); 
+    sem_t * sem_newFile = sem_open(SEM_newFile, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR, 0); //Semaforo para comunicarle al proceso viste que se escribio un nuevo archivo en la SHM
     if (sem_newFile == SEM_FAILED) perror ("newFile sem_open");
 
-
+    //Abro y configuro la SHM
     int fd = shm_open(SHM_NAME, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
     if (fd == -1) perror ("shm_open");
 
@@ -39,21 +39,20 @@ int main (int argc, char *argv[]) {
     if (address == MAP_FAILED) perror ("mmap");
     char * shm_p = (char *) address;
 
+    // Le aviso al Vista que ya se creo la SHM
     if (sem_post(sem_createShm) == -1) perror("View to start sem_post");    
     
+    //Envio datos relevantes al proceso vista
     char buff[8] = {0};
-    sprintf(buff,"%d\n",num_task); //Envio datos relevantes al proceso vista
+    sprintf(buff,"%d\n",num_task); 
     write(STDOUT_FILENO, buff, 8);
 
     sleep(2); //Espero a que comience el proceso vista
 
-    // struct timespec time;
-    // time.tv_sec = 8;
-    // sem_timedwait(sem_waitViewToStart, &time);
-
     create_slaves(slaves, num_slave, argv); //Creo los esclavos
-    read_and_send_files(slaves, num_task, num_slave, shm_p, result_file, argv, sem_newFile);
+    read_and_send_files(slaves, num_task, num_slave, shm_p, result_file, argv, sem_newFile); // Proceso todos los archivos y se los envio a los esclavos
 
+    // Me fijo si empezo el vista para ver si lo tengo que esperar a que termine
     int value;
     sem_getvalue(sem_waitViewToStart, &value);
     if (value) {
@@ -62,9 +61,6 @@ int main (int argc, char *argv[]) {
         printf("View did not start\n");
     }
 
-    // dexec="docker exec -ti \$(docker ps | tail -n1 | cut -d ' ' -f 1) bash"
-
-
 
     // //Unlink a todos los semaforos
     if (sem_unlink(SEM_CreateShm) == -1) perror("sem_unlink");
@@ -72,11 +68,13 @@ int main (int argc, char *argv[]) {
     if (sem_unlink(SEM_waitViewToFinish) == -1) perror("sem_unlink");
     if (sem_unlink(SEM_newFile) == -1) perror("sem_unlink");
 
+    //Cierro los semaforos
     if (sem_close(sem_createShm) == -1) perror("sem_unlink");
     if (sem_close(sem_waitViewToFinish) == -1) perror("sem_unlink");
     if (sem_close(sem_waitViewToStart) == -1) perror("sem_unlink");
     if (sem_close(sem_newFile) == -1) perror("sem_unlink");
 
+    //Termino de trabajar con la SHM y cierro el result_file
     if (munmap(address, shm_size) == -1) perror("munmap");
     if (shm_unlink(SHM_NAME) == -1) perror("shm_unlink");
     if (close(fd) == -1) perror("close fd");
@@ -124,11 +122,13 @@ void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_
     int finished_tasks = 0, tasks_to_send = num_slaves + 1;
     char buffer[BUFFER_SIZE];
 
+    //Itero por las tareas
     while (finished_tasks < num_task) {
         fd_set read_fdSet;
         FD_ZERO(&read_fdSet);
         int max = 0;
 
+        //Cargo los sets para el select
         for(int i = 0; i < num_slaves; i++){
             if (slaves[i].active) {
                 FD_SET(slaves[i].fd_out,&read_fdSet);
@@ -140,6 +140,7 @@ void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_
 
         if( select(max + 1, &read_fdSet, NULL, NULL,NULL) == -1) perror("read_and_send_files() select");
 
+        //Me fijo que fd esta para leer, en tal caso lo leo y le envio otro archivo al esclavo
         for(int i = 0; i < num_slaves;i++ ) {
             if(slaves[i].active && FD_ISSET(slaves[i].fd_out,&read_fdSet)){
                 read(slaves[i].fd_out, buffer, BUFFER_SIZE); 
@@ -150,9 +151,7 @@ void read_and_send_files(slave slaves[], int num_task,int num_slaves, char *shm_
                 strcat((shm_p+position), str);
                 strcat((shm_p+position), " ");
                 strcat((shm_p+position), buffer);
-                // printf("%s", (shm_p+position));    
                 sem_post(sem_newFile);     
-                // printf("%d %s\n", slaves[i].pid, buffer);
 
                 if (tasks_to_send <= num_task) {
                     write(slaves[i].fd_in, argv[tasks_to_send], strlen(argv[tasks_to_send]));
