@@ -6,3 +6,5 @@ view
 .vscode
 .gitconfig
 fresult.txt
+*.txt
+./hola

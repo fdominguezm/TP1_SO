@@ -8,30 +8,35 @@ void clearBuffer(char * buffer) {
     }
 }
 
-//argv[1] = slave pid
-//argv[2] = file_name
+//argv[0] = slave pid
+//argv[1] = file_name
 int main (int argc, char *argv[]) {
-    if (argc < 2) perror("slave: not enough arguments");
+    if (argc < 1) perror("slave: not enough arguments");
     
     char buffer [256]= {0};
     char command [256] = {0};
-    char * s = strcat(buffer, "md5sum ");
-    s = strcat(buffer, argv[2]);
-    FILE * md5 = popen(s, "r");
+    char * s;
+    int size;
+    FILE * md5;
+
+    s = strcat(command, "md5sum ");
+    s = strcat(command, argv[1]);
+    md5 = popen(s, "r");
     if (md5 == NULL) perror("slave: md5");
     if((s = fgets(buffer, 256, md5)) == NULL) perror ("slave: read md5");
-    printf("%s %s", argv[1], buffer);
-
+    write(STDOUT_FILENO, buffer, BUFFER_SIZE);
     clearBuffer(buffer);
-    int size;
+    clearBuffer(command);
+    pclose(md5);
+
     while ((size = read(STDIN_FILENO, buffer, 256)) > 1) {
-        buffer[size-1] = 0; //remove '\n'
+        // buffer[size-1] = 0; //remove '\n'
         s = strcat(command, "md5sum ");
         s = strcat(command, buffer);
         FILE * md5 = popen(s, "r");
         if (md5 == NULL) perror("slave: md5");
         if((s = fgets(buffer, 256, md5)) == NULL) perror ("slave: read md5");
-        printf("%s %s", argv[1], buffer);
+        write(STDOUT_FILENO, buffer, BUFFER_SIZE);
         clearBuffer(buffer);
         clearBuffer(command);
     }
