@@ -41,26 +41,43 @@ int main (int argc, char *argv[]) {
     if (sem_wait(sem_createShm) == -1) perror("VIEW.C: sem_createSHM wait");
     
     //Abro la shared memory y la configuro
-    int fd = shm_open(SHM_NAME, O_RDWR, 0);
-    if (fd == -1) perror ("VIEW.C: shm_open");
+    // int fd = shm_open(SHM_NAME, O_RDWR, 0);
+    // if (fd == -1) perror ("VIEW.C: shm_open");
 
-    if (ftruncate(fd, (off_t)shm_size) == -1) perror("VIEW.C: ftruncate");
+    // if (ftruncate(fd, (off_t)shm_size) == -1) perror("VIEW.C: ftruncate");
 
-    void * address = mmap(NULL, shm_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-    if (address == MAP_FAILED) perror ("VIEW.C: mmap");
-    char * shm_p = (char *) address;
+    // void * address = mmap(NULL, shm_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    // if (address == MAP_FAILED) perror ("VIEW.C: mmap");
+    // char * shm_p = (char *) address;
+
+    // if (mkfifo(N_PIPE, S_IRUSR) == -1) perror ("view: n_pipe create");
     
+    int n_pipe = open(N_PIPE,  O_RDONLY); //Creo el archivo result para enviarselo a los slaves
+    if (n_pipe == -1) perror("Result File Failed");
+    
+    int n = 0;
+    char s [BUFFER_SIZE] = {0};
     //Leo las entradas de la SHM
     for (size_t i = 0; i < num_task; i++){
-        sem_wait(sem_newFile);
-        int position = (i)*BUFFER_SIZE;
-        printf("%s\n",(shm_p+position));
+        // sem_wait(sem_newFile);
+        // int position = (i)*BUFFER_SIZE;
+        // printf("%s\n",(shm_p+position));
+        // n = read(n_pipe, s, BUFFER_SIZE);
+        // perror("justo antes del read");
+        n = read (n_pipe, s ,BUFFER_SIZE);
+        printf("%s", s);
+        for (int j = 0; j<BUFFER_SIZE; j++) {
+            s[j]=0;
+        }
     }
+
+    if (close(n_pipe) == -1) perror("view: close n pipe");
+
 
     //Aviso que termino el proceso vista
     if (sem_post(sem_waitViewToFinish) == -1) perror("View: sem_post");
 
-    if (munmap(address, shm_size) == -1) perror("view: munmap");
+    // if (munmap(address, shm_size) == -1) perror("view: munmap");
 
     return 0;
 }

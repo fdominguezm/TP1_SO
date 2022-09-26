@@ -11,3 +11,4 @@ fresult.txt
 .config
 PVS-Studio.log
 strace_out
+.lesshst

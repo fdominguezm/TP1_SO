@@ -25,6 +25,7 @@
 #define SEM_waitViewToStart "/sem4"
 #define SLAVE_NUM 5
 #define BUFFER_SIZE 256
+#define N_PIPE "/mypipe"
 
 typedef struct slave
 {
