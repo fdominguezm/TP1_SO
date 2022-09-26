@@ -99,6 +99,12 @@ void create_slaves(slave slaves[], int num_slave,char *const argv[]){
 
             if(dup2(fd_send_files[STDIN_FILENO],STDIN_FILENO) == -1 || dup2(fd_receive_buffer[STDOUT_FILENO],STDOUT_FILENO) == -1 ) perror("create_slaves() dup2");
 
+            int j = 0;
+            for (; j < i; j++) {
+                close(slaves[j].fd_in);
+                close(slaves[j].fd_out);
+            }
+
             char str[8];
             sprintf(str, "%d", getpid());
             char * args[] = {str, argv[i+1],NULL};
@@ -107,6 +113,8 @@ void create_slaves(slave slaves[], int num_slave,char *const argv[]){
             return;
 
         } else {// Estoy en el padre
+            close(fd_send_files[STDIN_FILENO]);
+            close(fd_receive_buffer[STDOUT_FILENO]);
 
             //Copio los datos de cada slave en la estructura
             slaves[i].fd_in = fd_send_files[1];
